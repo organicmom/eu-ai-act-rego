@@ -1,0 +1,65 @@
+{
+  "system": {
+    "id": "talent-screening-v2",
+    "name": "Talent Screening Assistant",
+    "version": "2.1.0",
+    "risk_tier": "high",
+    "use_case_domain": "employment",
+    "agent_type": "semi_autonomous",
+    "deployer": "Barclays PLC",
+    "provider": "Anthropic",
+    "description": "Screens CVs and ranks candidates for shortlisting. Output is a ranked list with scores presented to a human recruiter who makes the final decision.",
+    "owner_team": "talent-acquisition-engineering",
+    "last_reviewed": "2026-03-15"
+  },
+
+  "data_governance": {
+    "training_data_documented": true,
+    "bias_assessment_completed": true,
+    "gdpr_lawful_basis": "legitimate_interests",
+    "data_provenance_url": "https://confluence.internal/ai-systems/talent-screening/data-card",
+    "personal_data_processed": true,
+    "special_category_data": false
+  },
+
+  "logging": {
+    "enabled": true,
+    "retention_days": 365,
+    "storage_location": "s3://barclays-ai-audit-logs/talent-screening/",
+    "covers_inputs": true,
+    "covers_outputs": true,
+    "covers_human_overrides": true,
+    "integrity_protected": true
+  },
+
+  "oversight": {
+    "human_in_loop_threshold": "All candidate shortlisting decisions require recruiter review before candidate contact",
+    "override_mechanism": "Recruiter can exclude any AI-ranked candidate with single click; action logged with reason code",
+    "responsible_person": "Head of Talent Acquisition Technology",
+    "review_required_for_high_impact": true,
+    "autonomy_scope": "System may only rank and annotate CVs. It may not contact candidates, reject applications, or update ATS records autonomously."
+  },
+
+  "transparency": {
+    "ai_disclosure_implemented": true,
+    "synthetic_content_labelled": false,
+    "machine_readable_marking": false,
+    "instructions_for_use_documented": true,
+    "limitations_documented": true
+  },
+
+  "risk_management": {
+    "risk_management_documented": true,
+    "residual_risks_identified": true,
+    "risk_assessment_url": "https://confluence.internal/ai-systems/talent-screening/risk-assessment",
+    "post_market_monitoring_plan": true,
+    "incident_reporting_process": true
+  },
+
+  "conformity": {
+    "conformity_assessment_completed": true,
+    "ce_marking_affixed": false,
+    "eu_database_registered": false,
+    "declaration_of_conformity_url": ""
+  }
+}

@@ -1,0 +1,258 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/eu-ai-act-policies/schemas/ai-system.schema.json",
+  "title": "AI System Manifest",
+  "description": "Required declaration for every AI system subject to EU AI Act obligations. Commit this file alongside your service code. Evaluated by Conftest at PR time.",
+  "type": "object",
+  "required": [
+    "system",
+    "data_governance",
+    "logging",
+    "oversight",
+    "transparency",
+    "risk_management"
+  ],
+  "properties": {
+    "system": {
+      "type": "object",
+      "required": ["id", "name", "version", "risk_tier", "use_case_domain", "agent_type", "deployer"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique system identifier. Used as primary key in AI inventory."
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "risk_tier": {
+          "type": "string",
+          "enum": ["minimal", "limited", "high", "unacceptable"],
+          "description": "Declared risk tier. Annex III policy will auto-elevate if use_case_domain triggers high-risk."
+        },
+        "use_case_domain": {
+          "type": "string",
+          "enum": [
+            "employment",
+            "credit_scoring",
+            "insurance",
+            "biometrics",
+            "education",
+            "law_enforcement",
+            "healthcare_critical",
+            "critical_infrastructure",
+            "migration_asylum",
+            "administration_of_justice",
+            "essential_public_services",
+            "customer_support",
+            "internal_tooling",
+            "code_generation",
+            "content_generation",
+            "analytics",
+            "other"
+          ],
+          "description": "Primary use case domain. Annex III classification runs on this field."
+        },
+        "agent_type": {
+          "type": "string",
+          "enum": ["none", "assisted", "semi_autonomous", "autonomous"],
+          "description": "none = no agent; assisted = human drives, AI assists; semi_autonomous = AI acts within bounded scope; autonomous = AI acts without per-action approval"
+        },
+        "deployer": {
+          "type": "string",
+          "description": "Organisation deploying this system. You are a deployer if you use AI built by someone else."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Model or system provider (e.g. Anthropic, OpenAI, internal). Optional but recommended."
+        },
+        "description": {
+          "type": "string"
+        },
+        "owner_team": {
+          "type": "string"
+        },
+        "last_reviewed": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+
+    "data_governance": {
+      "type": "object",
+      "description": "Article 10 — Training and input data governance",
+      "required": ["training_data_documented", "bias_assessment_completed", "gdpr_lawful_basis"],
+      "properties": {
+        "training_data_documented": {
+          "type": "boolean",
+          "description": "Article 10(2): Training, validation, testing datasets documented with provenance."
+        },
+        "bias_assessment_completed": {
+          "type": "boolean",
+          "description": "Article 10(2)(f): Dataset examination for possible biases completed."
+        },
+        "gdpr_lawful_basis": {
+          "type": "string",
+          "enum": ["consent", "contract", "legal_obligation", "vital_interests", "public_task", "legitimate_interests", "not_applicable"],
+          "description": "GDPR Article 6 lawful basis for personal data processed by this system."
+        },
+        "data_provenance_url": {
+          "type": "string",
+          "description": "Link to data lineage documentation or data card."
+        },
+        "personal_data_processed": {
+          "type": "boolean",
+          "description": "Whether this system processes personal data of EU residents."
+        },
+        "special_category_data": {
+          "type": "boolean",
+          "description": "GDPR Article 9 special category data (health, biometrics, race, etc.)."
+        }
+      }
+    },
+
+    "logging": {
+      "type": "object",
+      "description": "Article 12 — Record keeping and logging",
+      "required": ["enabled", "retention_days", "storage_location"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Article 12(1): Automatic logging of events enabled."
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 180,
+          "description": "Article 12(1): Minimum 6 months (180 days) log retention required."
+        },
+        "storage_location": {
+          "type": "string",
+          "description": "Where logs are stored. Must be retrievable for regulatory review."
+        },
+        "covers_inputs": {
+          "type": "boolean",
+          "description": "Logs capture input data or references to input data."
+        },
+        "covers_outputs": {
+          "type": "boolean",
+          "description": "Logs capture AI system outputs and decisions."
+        },
+        "covers_human_overrides": {
+          "type": "boolean",
+          "description": "Logs capture human override events."
+        },
+        "integrity_protected": {
+          "type": "boolean",
+          "description": "Logs are write-once / tamper-evident."
+        }
+      }
+    },
+
+    "oversight": {
+      "type": "object",
+      "description": "Article 14 — Human oversight",
+      "required": ["human_in_loop_threshold", "override_mechanism", "responsible_person"],
+      "properties": {
+        "human_in_loop_threshold": {
+          "type": "string",
+          "description": "Article 14(1): Condition under which a human must review before action is taken. E.g. 'all decisions affecting individuals', 'confidence < 0.8', 'financial impact > £10k'."
+        },
+        "override_mechanism": {
+          "type": "string",
+          "description": "Article 14(4)(b): How a human can intervene, override, or halt the system."
+        },
+        "responsible_person": {
+          "type": "string",
+          "description": "Article 14(4): Named role or team responsible for human oversight."
+        },
+        "review_required_for_high_impact": {
+          "type": "boolean",
+          "description": "Article 14(5)(a): Individual with authority and competence can review, question, and override automated decisions."
+        },
+        "autonomy_scope": {
+          "type": "string",
+          "description": "Explicit description of actions the system may take autonomously without per-action human approval."
+        }
+      }
+    },
+
+    "transparency": {
+      "type": "object",
+      "description": "Article 13 + Article 50 — Transparency and disclosure",
+      "required": ["ai_disclosure_implemented", "synthetic_content_labelled"],
+      "properties": {
+        "ai_disclosure_implemented": {
+          "type": "boolean",
+          "description": "Article 50(1): Users informed they are interacting with an AI system."
+        },
+        "synthetic_content_labelled": {
+          "type": "boolean",
+          "description": "Article 50(2): AI-generated content labelled as such where applicable."
+        },
+        "machine_readable_marking": {
+          "type": "boolean",
+          "description": "Article 50(2): Synthetic content includes machine-readable watermarking or metadata."
+        },
+        "instructions_for_use_documented": {
+          "type": "boolean",
+          "description": "Article 13(1): Provider has supplied instructions on operation, limitations, and risks."
+        },
+        "limitations_documented": {
+          "type": "boolean",
+          "description": "Article 13(3)(b): System limitations and foreseeable circumstances where performance degrades are documented."
+        }
+      }
+    },
+
+    "risk_management": {
+      "type": "object",
+      "description": "Article 9 — Risk management system",
+      "required": ["risk_management_documented", "residual_risks_identified"],
+      "properties": {
+        "risk_management_documented": {
+          "type": "boolean",
+          "description": "Article 9(1): Risk management system established, documented, and maintained."
+        },
+        "residual_risks_identified": {
+          "type": "boolean",
+          "description": "Article 9(2)(d): Residual risks evaluated and communicated to deployers."
+        },
+        "risk_assessment_url": {
+          "type": "string",
+          "description": "Link to risk assessment document."
+        },
+        "post_market_monitoring_plan": {
+          "type": "boolean",
+          "description": "Article 72: Post-market monitoring plan in place for high-risk systems."
+        },
+        "incident_reporting_process": {
+          "type": "boolean",
+          "description": "Article 73: Serious incident reporting process defined."
+        }
+      }
+    },
+
+    "conformity": {
+      "type": "object",
+      "description": "Article 48/49 — Declaration of conformity and CE marking (high-risk only)",
+      "properties": {
+        "conformity_assessment_completed": {
+          "type": "boolean"
+        },
+        "ce_marking_affixed": {
+          "type": "boolean"
+        },
+        "eu_database_registered": {
+          "type": "boolean",
+          "description": "Article 49: High-risk AI systems must be registered in EU database before go-live."
+        },
+        "declaration_of_conformity_url": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

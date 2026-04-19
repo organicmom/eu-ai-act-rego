@@ -1,0 +1,156 @@
+name: EU AI Act Compliance Gate
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Runs on every PR that touches an ai-system.json manifest.
+# Blocks merge if any Rego DENY rules fire.
+# WARN rules post a PR comment but don't block.
+#
+# Prerequisites:
+# - ai-system.json exists at the repo root (or path configured below)
+# - OPA and Conftest installed in the runner (handled by setup steps below)
+# ─────────────────────────────────────────────────────────────────────────────
+
+on:
+  pull_request:
+    paths:
+      - 'ai-system.json'
+      - 'policies/**'
+      - '.github/workflows/eu-ai-act.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  OPA_VERSION: "1.7.1"
+  CONFTEST_VERSION: "0.57.0"
+  MANIFEST_PATH: "ai-system.json"
+  POLICY_DIR: "policies/"
+
+jobs:
+  eu-ai-act-compliance:
+    name: EU AI Act Policy Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Install OPA ──────────────────────────────────────────────────────────
+      - name: Install OPA
+        run: |
+          curl -L -o /usr/local/bin/opa \
+            https://github.com/open-policy-agent/opa/releases/download/v${{ env.OPA_VERSION }}/opa_linux_amd64_static
+          chmod +x /usr/local/bin/opa
+          opa version
+
+      # ── Install Conftest ─────────────────────────────────────────────────────
+      - name: Install Conftest
+        run: |
+          curl -L -o /tmp/conftest.tar.gz \
+            https://github.com/open-policy-agent/conftest/releases/download/v${{ env.CONFTEST_VERSION }}/conftest_${{ env.CONFTEST_VERSION }}_Linux_x86_64.tar.gz
+          tar xzf /tmp/conftest.tar.gz -C /usr/local/bin conftest
+          conftest --version
+
+      # ── Validate manifest against JSON Schema ────────────────────────────────
+      - name: Validate manifest schema
+        run: |
+          echo "Validating ${{ env.MANIFEST_PATH }} against ai-system.schema.json"
+          opa eval \
+            --data schemas/ai-system.schema.json \
+            --input ${{ env.MANIFEST_PATH }} \
+            --format pretty \
+            'data' > /dev/null
+          echo "Schema validation passed."
+
+      # ── Run Rego policies via Conftest ───────────────────────────────────────
+      - name: Run EU AI Act Rego policies
+        id: conftest
+        run: |
+          conftest test ${{ env.MANIFEST_PATH }} \
+            --policy ${{ env.POLICY_DIR }} \
+            --output json \
+            --all-namespaces \
+            > /tmp/conftest-results.json 2>&1 || true
+
+          echo "--- Conftest results ---"
+          cat /tmp/conftest-results.json
+
+          # Extract failures count for downstream steps
+          FAILURES=$(jq '[.[] | .failures // []] | flatten | length' /tmp/conftest-results.json)
+          WARNINGS=$(jq '[.[] | .warnings // []] | flatten | length' /tmp/conftest-results.json)
+
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+
+          echo "Failures: $FAILURES  |  Warnings: $WARNINGS"
+
+      # ── Run OPA unit tests ───────────────────────────────────────────────────
+      - name: Run OPA unit tests
+        run: |
+          opa test policies/ tests/ -v --format pretty
+          echo "All OPA unit tests passed."
+
+      # ── Post PR comment with results ─────────────────────────────────────────
+      - name: Post compliance report as PR comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('/tmp/conftest-results.json', 'utf8'));
+
+            const failures = results.flatMap(r => r.failures || []);
+            const warnings = results.flatMap(r => r.warnings || []);
+
+            const icon = failures.length > 0 ? '🚫' : warnings.length > 0 ? '⚠️' : '✅';
+            const status = failures.length > 0
+              ? 'BLOCKED — EU AI Act policy violations found'
+              : warnings.length > 0
+              ? 'PASSED with warnings'
+              : 'PASSED — all EU AI Act policies satisfied';
+
+            let body = `## ${icon} EU AI Act Compliance Check — ${status}\n\n`;
+
+            if (failures.length > 0) {
+              body += `### ❌ Policy violations (${failures.length}) — must fix before merge\n\n`;
+              failures.forEach(f => {
+                body += `- **${f.metadata?.title || 'Violation'}**: ${f.msg}\n`;
+              });
+              body += '\n';
+            }
+
+            if (warnings.length > 0) {
+              body += `### ⚠️ Warnings (${warnings.length}) — recommended fixes\n\n`;
+              warnings.forEach(w => {
+                body += `- ${w.msg}\n`;
+              });
+              body += '\n';
+            }
+
+            if (failures.length === 0 && warnings.length === 0) {
+              body += `All Article 9, 10, 12, 13, 14 and Annex III policies passed.\n`;
+            }
+
+            body += `\n---\n*Policies: [eu-ai-act-policies](https://github.com/eu-ai-act-policies) | Full enforcement deadline: August 2, 2026*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      # ── Hard fail if deny rules fired ────────────────────────────────────────
+      - name: Fail if policy violations found
+        if: steps.conftest.outputs.failures != '0'
+        run: |
+          echo "EU AI Act compliance gate FAILED."
+          echo "${{ steps.conftest.outputs.failures }} policy violation(s) must be resolved before merge."
+          echo ""
+          echo "Common fixes:"
+          echo "  Article 14: Add oversight.human_in_loop_threshold and override_mechanism"
+          echo "  Article 12: Set logging.enabled=true and retention_days >= 180"
+          echo "  Article 10: Add data_governance.bias_assessment_completed=true"
+          echo "  Annex III:  Check if use_case_domain triggers high-risk classification"
+          exit 1
